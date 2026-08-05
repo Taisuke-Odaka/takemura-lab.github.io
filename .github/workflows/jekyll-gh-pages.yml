@@ -1,56 +1,57 @@
-# Sample workflow for building and deploying a Jekyll site to GitHub Pages
 name: Deploy Jekyll with GitHub Pages dependencies preinstalled
-
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
-
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
-
+      # Rubyのセットアップ（blog フォルダで実行）
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
           bundler-cache: true
           working-directory: ./blog
-
+      # 1. /blog 内のJekyllを一時フォルダ (_jekyll_out) へビルド
       - name: Build with Jekyll
         working-directory: ./blog
-        run: bundle exec jekyll build --destination ../_site/blog
-
-      - name: Copy existing site
-        run: rsync -av --exclude '.git' --exclude 'blog' ./ ./_site/
-
+        run: bundle exec jekyll build --destination ../_jekyll_out
+      # 2. ルートにあるプレーンサイトを公開フォルダ (_site) へコピー
+      # (blog フォルダや不要ファイルは除外)
+      - name: Copy plain site
+        run: |
+          mkdir -p _site
+          rsync -av \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'blog' \
+            --exclude '_site' \
+            --exclude '_jekyll_out' \
+            ./ ./_site/
+      # 3. ビルドしたJekyllの成果物を _site/blog/ へ結合（上書き）
+      - name: Merge Jekyll build into _site/blog
+        run: |
+          mkdir -p ./_site/blog
+          cp -r ./_jekyll_out/* ./_site/blog/
+      # 4. 合体した _site フォルダをアップロード
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./_site
-  # Deployment job
+  # デプロイ処理
   deploy:
     environment:
       name: github-pages
@@ -61,3 +62,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
